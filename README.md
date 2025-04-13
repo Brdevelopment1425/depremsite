@@ -1,0 +1,2 @@
+# depremsite
+depremsıte
