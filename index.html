@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌍 Global Deprem Takip Sistemi</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+  <style>
+    * { user-select: none; -webkit-user-select: none; margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #121212; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+    header {
+      background: linear-gradient(90deg, #00f2ff, #00ff95, #ffd700);
+      padding: 2rem;
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: bold;
+      animation: glow 2s infinite alternate;
+      border-bottom: 4px solid #ff0;
+      letter-spacing: 3px;
+    }
+    @keyframes glow {
+      from { text-shadow: 0 0 20px #00f2ff; }
+      to { text-shadow: 0 0 30px #ffd700; }
+    }
+    #map {
+      height: 100vh;
+      width: 100vw;
+      filter: saturate(2) brightness(1.2);
+      transition: all 0.3s ease-in-out;
+    }
+    .alert-box {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(45deg, #ff0, #f00);
+      color: #000;
+      font-weight: bold;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      box-shadow: 0 0 25px #f00;
+      z-index: 9999;
+      font-size: 1.5rem;
+      animation: pulse 0.8s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.1); }
+      100% { transform: translateX(-50%) scale(1); }
+    }
+    .shake {
+      animation: shake 0.6s infinite;
+    }
+    @keyframes shake {
+      0% { transform: translateX(-50%) translateY(0); }
+      25% { transform: translateX(-50%) translateY(-5px); }
+      50% { transform: translateX(-50%) translateY(5px); }
+      75% { transform: translateX(-50%) translateY(-5px); }
+      100% { transform: translateX(-50%) translateY(0); }
+    }
+  </style>
+</head>
+<body oncontextmenu="return false" onkeydown="if(event.ctrlKey){event.preventDefault();}">
+  <header>🌍 Global Deprem Takip Sistemi</header>
+  <div id="map"></div>
+  <div id="alert"></div>
+  <audio id="deprem-sesi" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([20, 0], 2);  // Harita başlangıç koordinatları
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 10 }).addTo(map);
+    let lastID = null;
+    let markers = [];
+
+    // Deprem verisini kontrol etme fonksiyonu
+    async function kontrolEt() {
+      try {
+        const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson');
+        const data = await res.json();
+        console.log("Gelen Veriler:", data);  // API yanıtını konsola yazdır
+        const sonDeprem = data.features[0];
+        
+        if (sonDeprem) {
+          const id = sonDeprem.id;
+          if (id !== lastID) {
+            lastID = id;
+            uyar(sonDeprem);  // Uyarı göster
+            isaretle(sonDeprem);  // Deprem noktasını işaretle
+          }
+        } else {
+          console.error("Deprem verisi alınamadı.");
+        }
+      } catch (e) {
+        console.error("API Hatası: ", e);  // API hatası varsa, konsola yazdır
+      }
+    }
+
+    // Deprem noktalarını haritaya ekleme
+    function isaretle(eq) {
+      const coords = eq.geometry.coordinates;
+      const props = eq.properties;
+      const marker = L.marker([coords[1], coords[0]]).addTo(map)
+        .bindPopup(`<strong>📍 ${props.place}</strong><br>📈 Büyüklük: ${props.mag}<br>🕒 Zaman: ${new Date(props.time).toLocaleString()}`)
+        .on('mouseover', function() { this.openPopup(); })
+        .on('mouseout', function() { this.closePopup(); });
+      markers.push(marker);
+    }
+
+    // Deprem uyarısı göstermek
+    function uyar(eq) {
+      const props = eq.properties;
+      const alert = document.getElementById('alert');
+      alert.className = 'alert-box shake';
+      alert.innerHTML = `⚠️ DEPREM: ${props.place} → ${props.mag} ML`;
+      const ses = document.getElementById('deprem-sesi');
+      ses.play();
+      setTimeout(() => {
+        alert.innerHTML = '';
+        alert.className = '';
+      }, 15000);
+    }
+
+    // İlk kontrolü yapma
+    kontrolEt();
+    setInterval(kontrolEt, 5000);  // Her 5 saniyede bir kontrol et
+  </script>
+</body>
+</html>
